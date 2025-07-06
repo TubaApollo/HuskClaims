@@ -9,10 +9,10 @@ dependencies {
     compileOnly 'io.papermc.paper:paper-api:1.19.4-R0.1-SNAPSHOT'
 
     compileOnly 'org.jetbrains:annotations:26.0.2'
-    compileOnly 'org.projectlombok:lombok:1.18.36'
-    compileOnly 'net.william278.cloplib:cloplib-bukkit:2.0.3'
+    compileOnly 'org.projectlombok:lombok:1.18.38'
+    compileOnly 'net.william278.cloplib:cloplib-bukkit:2.0.12'
 
-    annotationProcessor 'org.projectlombok:lombok:1.18.36'
+    annotationProcessor 'org.projectlombok:lombok:1.18.38'
 }
 
 shadowJar {
@@ -31,6 +31,7 @@ shadowJar {
     relocate 'net.william278.paginedown', 'net.william278.huskclaims.libraries.paginedown'
     relocate 'net.william278.desertwell', 'net.william278.huskclaims.libraries.desertwell'
     relocate 'net.william278.cloplib', 'net.william278.huskclaims.libraries.cloplib'
+    relocate 'net.william278.toilet', 'net.william278.huskclaims.libraries.toilet'
     relocate 'org.json', 'net.william278.huskclaims.libraries.json'
     relocate 'dev.dejvokep.boostedyaml', 'net.william278.huskclaims.libraries.boostedyaml'
     relocate 'org.snakeyaml', 'net.william278.huskclaims.libraries.snakeyaml'
@@ -47,7 +48,7 @@ shadowJar {
 
 tasks {
     runServer {
-        minecraftVersion('1.21.4')
+        minecraftVersion('1.21.5')
         downloadPlugins {
             url("https://download.luckperms.net/1569/bukkit/loader/LuckPerms-Bukkit-5.4.152.jar")
 

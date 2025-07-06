@@ -17,32 +17,17 @@
  *  limitations under the License.
  */
 
-package net.william278.huskclaims.hook;
+package net.william278.huskclaims.event;
 
-import com.sk89q.worldguard.WorldGuard;
-import com.sk89q.worldguard.protection.flags.StateFlag;
-import com.sk89q.worldguard.protection.flags.registry.FlagRegistry;
-import net.william278.huskclaims.HuskClaims;
+import net.william278.huskclaims.claim.Claim;
 import org.jetbrains.annotations.NotNull;
 
-public abstract class WorldGuardHook extends RestrictedRegionHook {
+public interface PostCreateChildClaimEvent extends OnlineUserEvent, ClaimEvent, ChildClaimEvent, Event {
 
-    public final static StateFlag CLAIMING = new StateFlag("huskclaims-claim", false);
-
-    public WorldGuardHook(@NotNull HuskClaims plugin) {
-        super(plugin);
-    }
-
+    @NotNull
     @Override
-    public void load() {
-        final FlagRegistry registry = WorldGuard.getInstance().getFlagRegistry();
-        if (registry.get(CLAIMING.getName()) == null) {
-            registry.register(CLAIMING);
-        }
-    }
-
-    @Override
-    public void unload() {
+    default Claim getParentClaim() {
+        return getClaim().getParent().orElseThrow();
     }
 
 }

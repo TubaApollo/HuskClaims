@@ -17,32 +17,26 @@
  *  limitations under the License.
  */
 
-package net.william278.huskclaims.hook;
+package net.william278.huskclaims.event;
 
-import com.sk89q.worldguard.WorldGuard;
-import com.sk89q.worldguard.protection.flags.StateFlag;
-import com.sk89q.worldguard.protection.flags.registry.FlagRegistry;
+import lombok.Getter;
 import net.william278.huskclaims.HuskClaims;
+import net.william278.huskclaims.claim.Claim;
+import net.william278.huskclaims.claim.ClaimWorld;
+import net.william278.huskclaims.user.OnlineUser;
 import org.jetbrains.annotations.NotNull;
 
-public abstract class WorldGuardHook extends RestrictedRegionHook {
+@Getter
+public class BukkitPostCreateClaimEvent extends BukkitPlayerEvent implements PostCreateClaimEvent {
 
-    public final static StateFlag CLAIMING = new StateFlag("huskclaims-claim", false);
+    private final Claim claim;
+    private final ClaimWorld claimWorld;
 
-    public WorldGuardHook(@NotNull HuskClaims plugin) {
-        super(plugin);
-    }
-
-    @Override
-    public void load() {
-        final FlagRegistry registry = WorldGuard.getInstance().getFlagRegistry();
-        if (registry.get(CLAIMING.getName()) == null) {
-            registry.register(CLAIMING);
-        }
-    }
-
-    @Override
-    public void unload() {
+    protected BukkitPostCreateClaimEvent(@NotNull OnlineUser user, @NotNull Claim claim,
+                                         @NotNull ClaimWorld claimWorld, @NotNull HuskClaims plugin) {
+        super(user, plugin);
+        this.claim = claim;
+        this.claimWorld = claimWorld;
     }
 
 }

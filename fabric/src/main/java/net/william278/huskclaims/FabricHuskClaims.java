@@ -25,6 +25,7 @@ import com.google.common.collect.Queues;
 import com.google.common.collect.Sets;
 import com.google.common.primitives.Longs;
 import com.google.gson.Gson;
+import com.pokeskies.fabricpluginmessaging.PluginMessageEvent;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -32,12 +33,10 @@ import net.fabricmc.api.DedicatedServerModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.kyori.adventure.audience.Audience;
-//#if MC==12104
+//#if MC>=12104
 import net.kyori.adventure.platform.modcommon.MinecraftServerAudiences;
 //#else
 //$$ import net.kyori.adventure.platform.fabric.FabricServerAudiences;
@@ -69,7 +68,6 @@ import net.william278.huskclaims.hook.Hook;
 import net.william278.huskclaims.listener.ClaimsListener;
 import net.william278.huskclaims.listener.FabricListener;
 import net.william278.huskclaims.network.Broker;
-import net.william278.huskclaims.network.FabricPluginMessage;
 import net.william278.huskclaims.network.PluginMessageBroker;
 import net.william278.huskclaims.pet.FabricPetHandler;
 import net.william278.huskclaims.position.Position;
@@ -79,6 +77,8 @@ import net.william278.huskclaims.trust.TrustTag;
 import net.william278.huskclaims.trust.UserGroup;
 import net.william278.huskclaims.user.*;
 import net.william278.huskclaims.util.*;
+import net.william278.toilet.Toilet;
+import net.william278.toilet.fabric.FabricToilet;
 import org.apache.commons.lang3.ArrayUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -100,7 +100,7 @@ import java.util.logging.Level;
 @Getter
 public class FabricHuskClaims implements DedicatedServerModInitializer, HuskClaims, FabricTask.Supplier,
         FabricUserProvider, FabricBlockProvider, FabricSafeTeleportProvider, FabricPetHandler, FabricEventDispatcher,
-        FabricHookProvider, ServerPlayNetworking.PlayPayloadHandler<FabricPluginMessage> {
+        FabricHookProvider {
 
     public static final Logger LOGGER = LoggerFactory.getLogger("HuskClaims");
     public static final Identifier INITIAL_PHASE = Identifier.of("huskclaims", "on_enable");
@@ -108,12 +108,13 @@ public class FabricHuskClaims implements DedicatedServerModInitializer, HuskClai
             .orElseThrow(() -> new RuntimeException("Failed to get Mod Container"));
     private final Map<String, Boolean> permissions = Maps.newHashMap();
 
-    //#if MC==12104
+    //#if MC>=12104
     private MinecraftServerAudiences audiences;
     //#else
     //$$ private FabricServerAudiences audiences;
     //#endif
     private MinecraftServer minecraftServer;
+    private Toilet toilet;
 
     private final Gson gson = getGsonBuilder().create();
     private final Set<TrustTag> trustTags = ConcurrentHashMap.newKeySet();
@@ -162,11 +163,12 @@ public class FabricHuskClaims implements DedicatedServerModInitializer, HuskClai
 
     private void onEnable(@NotNull MinecraftServer server) {
         this.minecraftServer = server;
-        //#if MC==12104
+        //#if MC>=12104
         this.audiences = MinecraftServerAudiences.of(minecraftServer);
         //#else
         //$$ this.audiences = FabricServerAudiences.of(minecraftServer);
         //#endif
+        this.toilet = FabricToilet.create(getDumpOptions(), minecraftServer);
         this.enable();
     }
 
@@ -307,22 +309,16 @@ public class FabricHuskClaims implements DedicatedServerModInitializer, HuskClai
 
     @Override
     public void setupPluginMessagingChannels() {
-        PayloadTypeRegistry.playC2S().register(FabricPluginMessage.CHANNEL_ID, FabricPluginMessage.CODEC);
-        PayloadTypeRegistry.playS2C().register(FabricPluginMessage.CHANNEL_ID, FabricPluginMessage.CODEC);
-        ServerPlayNetworking.registerGlobalReceiver(FabricPluginMessage.CHANNEL_ID, this);
-    }
-
-    // When the server receives a plugin message
-    @Override
-    public void receive(@NotNull FabricPluginMessage payload, @NotNull ServerPlayNetworking.Context context) {
-        if (broker instanceof PluginMessageBroker messenger &&
-                getSettings().getCrossServer().getBrokerType() == Broker.Type.PLUGIN_MESSAGE) {
-            messenger.onReceive(
-                    PluginMessageBroker.BUNGEE_CHANNEL_ID,
-                    getOnlineUser(context.player()),
-                    payload.getData()
-            );
-        }
+        PluginMessageEvent.EVENT.register((payload, context) -> {
+            if (broker instanceof PluginMessageBroker messenger &&
+                    getSettings().getCrossServer().getBrokerType() == Broker.Type.PLUGIN_MESSAGE) {
+                messenger.onReceive(
+                        PluginMessageBroker.BUNGEE_CHANNEL_ID,
+                        getOnlineUser(context.player()),
+                        payload.getData()
+                );
+            }
+        });
     }
 
     @Override

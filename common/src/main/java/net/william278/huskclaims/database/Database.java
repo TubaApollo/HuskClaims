@@ -19,6 +19,7 @@
 
 package net.william278.huskclaims.database;
 
+import com.google.common.collect.Maps;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import net.william278.huskclaims.HuskClaims;
@@ -29,6 +30,7 @@ import net.william278.huskclaims.trust.UserGroup;
 import net.william278.huskclaims.user.SavedUser;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -39,6 +41,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -155,6 +158,7 @@ public abstract class Database {
                         plugin.log(Level.WARNING, "Migration " + migration.getMigrationName()
                                 + " (v" + migration.getVersion() + ") failed; skipping", e);
                     }
+                    migration.executeRunnable(this);
                 }
             }
             setSchemaVersion(latestVersion);
@@ -382,22 +386,59 @@ public abstract class Database {
         CONVERT_TO_JSONB(
                 2, "convert_to_jsonb",
                 Type.SQLITE
+        ),
+        ADD_SPENT_CLAIM_BLOCKS_COLUMN(
+                3, "add_spent_claim_blocks_column",
+                (database) -> {
+                    // Update all users to have the correct spent_claim_blocks
+                    final Map<UUID, SavedUser> users = Maps.newHashMap();
+                    for (ClaimWorld world : database.getAllClaimWorlds().values()) {
+                        world.getClaims().stream().filter(c -> c.getOwner().isPresent()).forEach(claim -> {
+                            final UUID owner = claim.getOwner().get();
+                            if (!users.containsKey(owner)) {
+                                database.getUser(owner).ifPresent(user -> users.put(owner, user));
+                            }
+                            final SavedUser user = users.getOrDefault(owner, null);
+                            if (user == null) {
+                                return;
+                            }
+                            user.setSpentClaimBlocks(user.getSpentClaimBlocks() + claim.getRegion().getSurfaceArea());
+                            users.put(owner, user);
+                        });
+                    }
+                    users.values().forEach(database::updateUser);
+                },
+                Type.MYSQL, Type.MARIADB, Type.SQLITE
         );
 
         private final int version;
         private final String migrationName;
         private final Type[] supportedTypes;
+        private final Consumer<Database> runnable;
 
-        Migration(int version, @NotNull String migrationName, @NotNull Type... supportedTypes) {
+        Migration(int version, @NotNull String migrationName, @Nullable Consumer<Database> runnable,
+                  @NotNull Type... supportedTypes) {
             this.version = version;
             this.migrationName = migrationName;
             this.supportedTypes = supportedTypes;
+            this.runnable = runnable;
+        }
+
+        Migration(int version, @NotNull String migrationName, @NotNull Type... supportedTypes) {
+            this(version, migrationName, null, supportedTypes);
+        }
+
+        private void executeRunnable(@NotNull Database database) {
+            if (runnable != null) {
+                runnable.accept(database);
+            }
         }
 
         private int getVersion() {
             return version;
         }
 
+        @NotNull
         private String getMigrationName() {
             return migrationName;
         }
@@ -416,7 +457,6 @@ public abstract class Database {
         public static int getLatestVersion() {
             return getOrderedMigrations().get(getOrderedMigrations().size() - 1).getVersion();
         }
-
     }
 
 }
